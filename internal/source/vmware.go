@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -289,6 +290,9 @@ func (s *InternalVMwareSource) GetAllVMs(ctx context.Context, sourceSpecificIDs 
 	grp := errgroup.Group{}
 	grp.SetLimit(s.SyncLimit)
 
+	// To protect concurrent appends to vms and warnings.
+	var appendMutex sync.Mutex
+
 	filter := map[string]bool{}
 	for _, id := range sourceSpecificIDs {
 		filter[id] = true
@@ -302,6 +306,10 @@ func (s *InternalVMwareSource) GetAllVMs(ctx context.Context, sourceSpecificIDs 
 
 		grp.Go(func() error {
 			inst, warningType, err := s.getVM(ctx, vm, tc, networkLocationsByID, catMap)
+
+			appendMutex.Lock()
+			defer appendMutex.Unlock()
+
 			if err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {
 					if ctx.Err() != nil {
@@ -398,18 +406,22 @@ func (s *InternalVMwareSource) getVM(ctx context.Context, vm *object.VirtualMach
 			}
 		}
 
-		// VMware returns an error if the VM happens to not have resource pools, so we only return early if there was a context deadline error.
-		log.Debug("Fetching VM resource pool name")
-		var pool mo.ResourcePool
-		err = property.DefaultCollector(s.govmomiClient.Client).RetrieveOne(ctx, *vmProperties.ResourcePool, []string{"name"}, &pool)
-		if err != nil {
-			log.Error("Failed determine resource pool name for VM", slog.Any("error", err))
-			if errors.Is(err, context.DeadlineExceeded) {
-				return nil, api.InstanceImportFailed, fmt.Errorf("Failed to fetch resource pool names for VM %q: %w", vm.InventoryPath, err)
+		// Guarding against VMs with no resource pool.
+		if vmProperties.ResourcePool != nil {
+			// VMware returns an error if the VM happens to not have resource pools, so we only return early if there was a context deadline error.
+			log.Debug("Fetching VM resource pool name")
+
+			var pool mo.ResourcePool
+			err = property.DefaultCollector(s.govmomiClient.Client).RetrieveOne(ctx, *vmProperties.ResourcePool, []string{"name"}, &pool)
+			if err != nil {
+				log.Error("Failed determine resource pool name for VM", slog.Any("error", err))
+				if errors.Is(err, context.DeadlineExceeded) {
+					return nil, api.InstanceImportFailed, fmt.Errorf("Failed to fetch resource pool names for VM %q: %w", vm.InventoryPath, err)
+				}
+			} else {
+				resourcePoolKey := fmt.Sprintf("%s.resource_pool", s.SourceType)
+				vmProps.Config[resourcePoolKey] = pool.Name
 			}
-		} else {
-			resourcePoolKey := fmt.Sprintf("%s.resource_pool", s.SourceType)
-			vmProps.Config[resourcePoolKey] = pool.Name
 		}
 	}
 
