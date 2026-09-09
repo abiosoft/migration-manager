@@ -166,7 +166,7 @@ func (t *InternalIncusTarget) client(ctx context.Context) (*incus.ConnectionArgs
 }
 
 func (t *InternalIncusTarget) DoBasicConnectivityCheck() (api.ExternalConnectivityStatus, *x509.Certificate) {
-	status, cert := util.DoBasicConnectivityCheck(t.Endpoint, t.TrustedServerCertificateFingerprint)
+	status, cert := util.DoBasicConnectivityCheck(t.Endpoint, t.TrustedServerCertificateFingerprint, nil)
 	if cert != nil && t.ServerCertificate == nil {
 		// We got an untrusted certificate; if one hasn't already been set, add it to this target.
 		t.ServerCertificate = cert.Raw
