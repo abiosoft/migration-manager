@@ -171,6 +171,12 @@ func (s Source) validateSourceTypeVMware() error {
 		return NewValidationErrf("Invalid source, specified datacenter must not be empty")
 	}
 
+	for i, caCertificate := range properties.TrustedServerCACertificates {
+		if !x509.NewCertPool().AppendCertsFromPEM([]byte(caCertificate)) {
+			return NewValidationErrf("Invalid source, trusted CA certificate at index %d is not a valid PEM encoded certificate", i)
+		}
+	}
+
 	return nil
 }
 
@@ -260,6 +266,39 @@ func (s *Source) SetServerCertificate(cert *x509.Certificate) {
 		properties.ServerCertificate = cert.Raw
 		s.Properties, _ = json.Marshal(properties)
 	}
+}
+
+// AddCACertificates records the given PEM encoded CA certificates in the source properties, so that
+// consumers of those properties without access to the local system configuration can use them too.
+func (s *Source) AddCACertificates(caCertificates []string) error {
+	if len(caCertificates) == 0 {
+		return nil
+	}
+
+	switch s.SourceType {
+	case api.SOURCETYPE_NSX_T:
+		properties, err := s.GetNSXProperties()
+		if err != nil {
+			return err
+		}
+
+		properties.TrustedServerCACertificates = append(properties.TrustedServerCACertificates, caCertificates...)
+		s.Properties, err = json.Marshal(properties)
+
+		return err
+	case api.SOURCETYPE_VMWARE:
+		properties, err := s.GetVMwareProperties()
+		if err != nil {
+			return err
+		}
+
+		properties.TrustedServerCACertificates = append(properties.TrustedServerCACertificates, caCertificates...)
+		s.Properties, err = json.Marshal(properties)
+
+		return err
+	}
+
+	return nil
 }
 
 type Sources []Source

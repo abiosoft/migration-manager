@@ -64,6 +64,9 @@ type VMwareProperties struct {
 	// Example: b51b3046a03164a2ca279222744b12fe0878a8c12311c88fad427f4e03eca42d
 	TrustedServerCertificateFingerprint string `json:"trusted_server_certificate_fingerprint,omitempty" yaml:"trusted_server_certificate_fingerprint,omitempty"`
 
+	// PEM encoded CA certificates to trust in addition to the system ones. Useful when the source uses a certificate issued by an internal CA.
+	TrustedServerCACertificates []string `json:"trusted_server_ca_certificates,omitempty" yaml:"trusted_server_ca_certificates,omitempty"`
+
 	// Username to authenticate against the endpoint
 	// Example: admin
 	Username string `json:"username" yaml:"username"`

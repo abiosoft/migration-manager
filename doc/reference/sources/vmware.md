@@ -114,3 +114,17 @@ They are applied to migrated instances as `user.sdn.tags.{index}.{scope}={tag}` 
 All data imported from sources will be updated every 10 minutes by default. This can be configured in [system settings](../settings.md).
 
 Once an instance is assigned to a batch, its syncing will be halted unless that instance is restricted from migration (such as missing guest-agent data or being powered off).
+
+## TLS certificate trust
+
+Migration Manager verifies the TLS certificate presented by a source against the system trust store.
+If the source uses a certificate that isn't trusted by default, either:
+
+* Confirm the certificate fingerprint when adding the source, which pins that exact certificate, or
+* Provide the issuing CA with `migration-manager source add --trusted-ca-file <file>` or `migration-manager source update --trusted-ca-file <file>`.
+
+When Migration Manager runs on Incus OS, the CA certificates configured at the Incus OS system security
+level are trusted as well, without any additional source configuration.
+
+Both the pinned certificate and the CA certificates are passed on to the migration worker, which doesn't
+share the trust store of the system Migration Manager runs on.

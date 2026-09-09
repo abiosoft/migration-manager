@@ -225,6 +225,26 @@ func TestSourceService_Create(t *testing.T) {
 			},
 		},
 		{
+			name: "error - VMware invalid trusted CA certificate",
+			source: migration.Source{
+				ID:         1,
+				Name:       "one",
+				SourceType: api.SOURCETYPE_VMWARE,
+				Properties: json.RawMessage(`{
+  "endpoint": "enpoint.url",
+  "username": "user",
+  "password": "pass",
+  "trusted_server_ca_certificates": ["not a certificate"]
+}
+`),
+			},
+
+			assertErr: func(tt require.TestingT, err error, a ...any) {
+				var verr migration.ErrValidation
+				require.ErrorAs(tt, err, &verr, a...)
+			},
+		},
+		{
 			name: "error - repo",
 			source: migration.Source{
 				ID:         1,

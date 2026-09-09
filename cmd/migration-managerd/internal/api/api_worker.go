@@ -16,6 +16,7 @@ import (
 	"github.com/FuturFusion/migration-manager/internal/server/response"
 	"github.com/FuturFusion/migration-manager/internal/source"
 	"github.com/FuturFusion/migration-manager/internal/transaction"
+	"github.com/FuturFusion/migration-manager/internal/util"
 	"github.com/FuturFusion/migration-manager/shared/api"
 	"github.com/FuturFusion/migration-manager/shared/api/event"
 )
@@ -126,6 +127,12 @@ func workerCommandPost(d *Daemon, r *http.Request) response.Response {
 
 		return nil
 	})
+	if err != nil {
+		return response.SmartError(err)
+	}
+
+	// Include any system level CA certificates so the worker can verify the source's TLS certificate.
+	err = workerCommand.Source.AddCACertificates(util.SystemCACertificates())
 	if err != nil {
 		return response.SmartError(err)
 	}
