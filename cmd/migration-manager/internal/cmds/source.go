@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"slices"
 	"sort"
 	"strconv"
@@ -61,6 +62,7 @@ type cmdSourceAdd struct {
 	global *CmdGlobal
 
 	flagTrustedServerCertificateFingerprint string
+	flagTrustedCAFile                       string
 }
 
 func (c *cmdSourceAdd) Command() *cobra.Command {
@@ -79,6 +81,7 @@ func (c *cmdSourceAdd) Command() *cobra.Command {
 
 	cmd.RunE = c.Run
 	cmd.Flags().StringVar(&c.flagTrustedServerCertificateFingerprint, "trusted-cert-fingerprint", "", "Trusted SHA256 fingerprint of the source's TLS certificate")
+	cmd.Flags().StringVar(&c.flagTrustedCAFile, "trusted-ca-file", "", "Path to a PEM encoded CA certificate bundle used to verify the source's TLS certificate")
 
 	return cmd
 }
@@ -106,6 +109,11 @@ func (c *cmdSourceAdd) Run(cmd *cobra.Command, args []string) error {
 	} else {
 		sourceName = args[0]
 		sourceEndpoint = args[1]
+	}
+
+	caCertificates, err := readCACertificates(c.flagTrustedCAFile)
+	if err != nil {
+		return err
 	}
 
 	// Add the source.
@@ -159,6 +167,7 @@ func (c *cmdSourceAdd) Run(cmd *cobra.Command, args []string) error {
 		vmwareProperties := api.VMwareProperties{
 			Endpoint:                            sourceEndpoint,
 			TrustedServerCertificateFingerprint: c.flagTrustedServerCertificateFingerprint,
+			TrustedServerCACertificates:         caCertificates,
 			Username:                            sourceUsername,
 			Password:                            sourcePassword,
 			ImportLimit:                         int(importLimit),
@@ -320,6 +329,8 @@ func (c *cmdSourceRemove) Run(cmd *cobra.Command, args []string) error {
 // Update the source.
 type cmdSourceUpdate struct {
 	global *CmdGlobal
+
+	flagTrustedCAFile string
 }
 
 func (c *cmdSourceUpdate) Command() *cobra.Command {
@@ -331,6 +342,7 @@ func (c *cmdSourceUpdate) Command() *cobra.Command {
 `
 
 	cmd.RunE = c.Run
+	cmd.Flags().StringVar(&c.flagTrustedCAFile, "trusted-ca-file", "", "Path to a PEM encoded CA certificate bundle used to verify the source's TLS certificate")
 
 	return cmd
 }
@@ -446,6 +458,13 @@ func (c *cmdSourceUpdate) Run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
+		if cmd.Flags().Changed("trusted-ca-file") {
+			vmwareProperties.TrustedServerCACertificates, err = readCACertificates(c.flagTrustedCAFile)
+			if err != nil {
+				return err
+			}
+		}
+
 		src.Properties, err = json.Marshal(vmwareProperties)
 		if err != nil {
 			return err
@@ -484,4 +503,18 @@ func (c *cmdSourceUpdate) Run(cmd *cobra.Command, args []string) error {
 	cmd.Printf("Successfully updated source %q.\n", newSourceName)
 
 	return nil
+}
+
+// readCACertificates reads a PEM encoded CA certificate bundle from the given path.
+func readCACertificates(path string) ([]string, error) {
+	if path == "" {
+		return nil, nil
+	}
+
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to read CA certificate file %q: %w", path, err)
+	}
+
+	return []string{string(contents)}, nil
 }
