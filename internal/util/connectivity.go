@@ -12,10 +12,19 @@ import (
 	"github.com/FuturFusion/migration-manager/shared/api"
 )
 
-func DoBasicConnectivityCheck(endpoint string, trustedCertFingerprint string) (api.ExternalConnectivityStatus, *x509.Certificate) {
+func DoBasicConnectivityCheck(endpoint string, trustedCertFingerprint string, caCertificates []string) (api.ExternalConnectivityStatus, *x509.Certificate) {
+	tlsConfig, err := TLSClientConfig(nil, caCertificates)
+	if err != nil {
+		return api.EXTERNALCONNECTIVITYSTATUS_TLS_ERROR, nil
+	}
+
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = tlsConfig
+
 	// Do a basic connectivity test.
 	client := &http.Client{
-		Timeout: 3 * time.Second, // Timeout quickly if we cannot connect to the endpoint.
+		Timeout:   3 * time.Second, // Timeout quickly if we cannot connect to the endpoint.
+		Transport: transport,
 	}
 
 	resp, err := client.Get(endpoint)
