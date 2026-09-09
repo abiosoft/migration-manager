@@ -71,6 +71,7 @@ func newInternalVMwareSourceFrom(apiSource api.Source) (*InternalVMwareSource, e
 	}
 
 	connProperties.SetDefaults()
+	connProperties.TrustedServerCACertificates = append(connProperties.TrustedServerCACertificates, util.SystemCACertificates()...)
 
 	return &InternalVMwareSource{
 		InternalSource: InternalSource{
@@ -113,7 +114,12 @@ func (s *InternalVMwareSource) Connect(ctx context.Context) error {
 		serverCert = nil
 	}
 
-	s.govmomiClient, err = soapWithKeepalive(ctx, endpointURL, serverCert)
+	tlsConfig, err := util.TLSClientConfig(serverCert, s.TrustedServerCACertificates)
+	if err != nil {
+		return err
+	}
+
+	s.govmomiClient, err = soapWithKeepalive(ctx, endpointURL, tlsConfig)
 	if err != nil {
 		return err
 	}
@@ -133,7 +139,7 @@ func (s *InternalVMwareSource) Connect(ctx context.Context) error {
 }
 
 func (s *InternalVMwareSource) DoBasicConnectivityCheck() (api.ExternalConnectivityStatus, *x509.Certificate) {
-	status, cert := util.DoBasicConnectivityCheck(s.Endpoint, s.TrustedServerCertificateFingerprint)
+	status, cert := util.DoBasicConnectivityCheck(s.Endpoint, s.TrustedServerCertificateFingerprint, s.TrustedServerCACertificates)
 	if cert != nil && s.ServerCertificate == nil {
 		// We got an untrusted certificate; if one hasn't already been set, add it to this source.
 		s.ServerCertificate = cert.Raw

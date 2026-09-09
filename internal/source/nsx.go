@@ -3,7 +3,6 @@ package source
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
 	"errors"
@@ -57,6 +56,8 @@ func NewInternalNSXSourceFrom(apiSource api.Source) (*InternalNSXSource, error) 
 		return nil, err
 	}
 
+	connProperties.TrustedServerCACertificates = append(connProperties.TrustedServerCACertificates, util.SystemCACertificates()...)
+
 	return &InternalNSXSource{
 		InternalSource: InternalSource{
 			Source: apiSource,
@@ -97,8 +98,10 @@ func (s *InternalNSXSource) Connect(ctx context.Context) error {
 		serverCert = nil
 	}
 
-	tlsConfig := &tls.Config{}
-	incusTLS.TLSConfigWithTrustedCert(tlsConfig, serverCert)
+	tlsConfig, err := util.TLSClientConfig(serverCert, s.TrustedServerCACertificates)
+	if err != nil {
+		return err
+	}
 
 	transport := &http.Transport{TLSClientConfig: tlsConfig}
 	s.c = &http.Client{Transport: transport}
@@ -163,7 +166,7 @@ func (s *InternalNSXSource) DoBasicConnectivityCheck() (api.ExternalConnectivity
 		return api.EXTERNALCONNECTIVITYSTATUS_AUTH_ERROR, nil
 	}
 
-	status, cert := util.DoBasicConnectivityCheck(s.Endpoint, s.TrustedServerCertificateFingerprint)
+	status, cert := util.DoBasicConnectivityCheck(s.Endpoint, s.TrustedServerCertificateFingerprint, s.TrustedServerCACertificates)
 	if cert != nil && s.ServerCertificate == nil {
 		// We got an untrusted certificate; if one hasn't already been set, add it to this source.
 		s.ServerCertificate = cert.Raw
