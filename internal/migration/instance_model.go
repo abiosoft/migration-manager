@@ -601,7 +601,7 @@ func (i Instance) CompileIncludeExpression(expression string, locationAlias bool
 			return s == tag
 		}
 
-		if exact {
+		if !exact {
 			containsFunc = func(s string) bool {
 				return strings.Contains(s, tag)
 			}

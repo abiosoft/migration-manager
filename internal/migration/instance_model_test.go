@@ -130,6 +130,43 @@ func TestInstance_TagConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestInstance_MatchesCriteriaTags(t *testing.T) {
+	instance := migration.Instance{
+		Properties: api.InstanceProperties{
+			Tags: []api.InstancePropertiesTag{
+				{Category: "mycategory", Tag: "tag1"},
+				{Tag: "uncategorized"},
+			},
+		},
+	}
+
+	tests := []struct {
+		expression string
+
+		want bool
+	}{
+		{expression: `has_tag('mycategory', 'tag1')`, want: true},
+		{expression: `has_tag('mycategory', 'tag')`, want: false},
+		{expression: `has_tag('othercategory', 'tag1')`, want: false},
+		{expression: `has_tag('*', 'tag1')`, want: true},
+		{expression: `matches_tag('mycategory', 'tag')`, want: true},
+		{expression: `matches_tag('*', 'categorized')`, want: true},
+		{expression: `matches_tag('*', 'nomatch')`, want: false},
+		{expression: `any(tags, .category == 'mycategory' and .tag == 'tag1')`, want: true},
+		{expression: `any(tags, .tag == 'uncategorized')`, want: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.expression, func(t *testing.T) {
+			got, err := instance.MatchesCriteria(tc.expression, false)
+
+			require.NoError(t, err)
+			require.Equal(t, tc.want, got)
+		})
+	}
+}
+
 func TestInstance_ApplyUpdatesSDNTags(t *testing.T) {
 	instance := func(tags []api.InstancePropertiesSDNTag) migration.Instance {
 		return migration.Instance{
