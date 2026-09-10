@@ -373,6 +373,9 @@ func (t *InternalIncusTarget) SetPostMigrationVMConfig(ctx context.Context, i mi
 	// Record the SDN tags imported from the source.
 	maps.Copy(apiDef.Config, i.SDNTagConfig())
 
+	// Record the tags imported from the source.
+	maps.Copy(apiDef.Config, i.TagConfig())
+
 	// Apply CPU and memory limits.
 	for name, info := range defs.GetAll() {
 		switch name {
