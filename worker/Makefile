@@ -10,10 +10,16 @@ clean:
 	sudo -E rm -Rf .cache/ mkosi.output/
 	sudo -E $(shell command -v mkosi) clean
 
+CUSTOM_KERNEL_PACKAGE := $(shell for package in kernel-packages/*.deb; do test -f "$$package" || continue; dpkg-deb -f "$$package" Package; done | awk '/^linux-image-/ && $$0 !~ /-dbg$$/ { print; exit }')
+CUSTOM_KERNEL_ARGS :=
+ifneq ($(CUSTOM_KERNEL_PACKAGE),)
+CUSTOM_KERNEL_ARGS = --package-directory kernel-packages --remove-package linux-image-zabbly --package $(CUSTOM_KERNEL_PACKAGE)
+endif
+
 .PHONY: build
 build:
 	sudo rm -Rf mkosi.output/migration-manager-worker*
-	sudo -E $(shell command -v mkosi) --cache-dir .cache/ build
+	sudo -E $(shell command -v mkosi) --cache-dir .cache/ $(CUSTOM_KERNEL_ARGS) build
 	sudo chown $(shell id -u):$(shell id -g) mkosi.output
 
 .PHONY: test

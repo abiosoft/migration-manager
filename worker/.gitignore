@@ -1,3 +1,4 @@
 .mkosi-private
 mkosi.cache
 mkosi.output
+kernel-packages
